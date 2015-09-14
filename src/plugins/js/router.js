@@ -428,6 +428,7 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
 
                     ensureActivation(activeItem, instance, instruction);
                 }).fail(function(err) {
+                    cancelNavigation(null, instruction);
                     system.error('Failed to load routed module (' + instruction.config.moduleId + '). Details: ' + err.message, err);
                 });
             }
@@ -469,7 +470,7 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
                 if (!config.viewUrl) {
                     config.moduleId = config.moduleId || router.convertRouteToModuleId(config.route);
                 }
-                
+
                 config.hash = config.hash || router.convertRouteToHash(config.route);
 
                 if (config.hasChildRoutes) {
@@ -547,9 +548,9 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
                     continue;
                 }
 
-                var parts = pair.split(/=(.+)?/),
-                    key = parts[0],
-                    value = parts[1] && decodeURIComponent(parts[1].replace(/\+/g, ' '));
+                var sp = pair.indexOf("="),
+                    key = sp === -1 ? pair : pair.substr(0, sp),
+                    value = sp === -1 ? null : decodeURIComponent(pair.substr(sp + 1).replace(/\+/g, ' '));
 
                 var existing = queryObject[key];
 
@@ -644,8 +645,8 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
             } else {
                 document.title = value;
             }
-        }  
-        
+        }
+
         // Allow observable to be used for app.title
         if(ko.isObservable(app.title)) {
             app.title.subscribe(function () {
@@ -654,7 +655,7 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
                 setTitle(title);
             });
         }
-        
+
         /**
          * Updates the document title based on the activated module instance, the routing instruction and the app.title.
          * @method updateDocumentTitle
@@ -664,7 +665,7 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
         router.updateDocumentTitle = function (instance, instruction) {
             var appTitle = ko.unwrap(app.title),
                 title = instruction.config.title;
-                
+
             if (titleSubscription) {
                 titleSubscription.dispose();
             }
@@ -1050,6 +1051,12 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
             var rootStripper = rootRouter.options.root && new RegExp("^" + rootRouter.options.root + "/");
 
             $(document).delegate("a", 'click', function(evt){
+                
+                // ignore default prevented since these are not supposed to behave like links anyway
+                if(evt.isDefaultPrevented()){
+                    return;
+                }
+
                 if(history._hasPushState){
                     if(!evt.altKey && !evt.ctrlKey && !evt.metaKey && !evt.shiftKey && rootRouter.targetIsThisWindow(evt)){
                         var href = $(this).attr("href");
@@ -1080,10 +1087,11 @@ define(['durandal/system', 'durandal/app', 'durandal/activator', 'durandal/event
     };
 
     /**
-     * Disable history, perhaps temporarily. Not useful in a real app, but possibly useful for unit testing Routers.
+     * Deactivate current items and turn history listening off.
      * @method deactivate
      */
     rootRouter.deactivate = function() {
+        rootRouter.activeItem(null);
         history.deactivate();
     };
 
